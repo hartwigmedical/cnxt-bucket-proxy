@@ -1,0 +1,35 @@
+{
+  "name": "cnxt-bucket-proxy",
+  "version": "0.1.0",
+  "description": "Serve a Google Cloud Storage bucket as a local cnxt domain, read with your own Google credentials",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "cnxt-bucket-proxy": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "dev": "node src/cli.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
+    "test": "vitest --run",
+    "typecheck": "tsc",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run typecheck && npm run format:check && npm test"
+  },
+  "dependencies": {
+    "google-auth-library": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.0",
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}
