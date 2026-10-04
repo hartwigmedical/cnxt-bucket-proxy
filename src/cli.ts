@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import type { Server } from "node:http";
+import { createInterface } from "node:readline/promises";
 import {
   CredentialsError,
   findCredentials,
@@ -17,7 +18,13 @@ import {
 } from "./datasources.ts";
 import { GcsError, HttpGcs, type Gcs } from "./gcs.ts";
 import { buildManifest, MAX_FILES, TABLE_GLOB } from "./manifest.ts";
-import { parseCommand, USAGE, type Options } from "./options.ts";
+import {
+  ANY_ORIGIN,
+  parseCommand,
+  parseOriginAnswer,
+  USAGE,
+  type Options,
+} from "./options.ts";
 import { createDomainServer, LIST_LIMIT } from "./server.ts";
 
 const HOST = "127.0.0.1";
@@ -120,12 +127,55 @@ async function serve(options: Options) {
       `  Base URL  http://${HOST}:${options.port}`,
       "  Auth      None",
       "",
-      "cnxt may connect from:",
-      ...options.origins.map((origin) => `  ${origin}`),
-      "Allow another with --origin. Press Ctrl+C to stop.",
+      ...(options.origins.includes(ANY_ORIGIN)
+        ? [
+            `Warning: any website you visit can read ${locationUri(location)} as you`,
+            "while this runs. To allow only cnxt, restart with --origin <its origin>.",
+          ]
+        : [
+            "Only these origins may connect:",
+            ...options.origins.map((origin) => `  ${origin}`),
+          ]),
+      "Press Ctrl+C to stop.",
       "",
     ].join("\n")
   );
+}
+
+async function askOrigins(): Promise<string[]> {
+  if (!process.stdin.isTTY) {
+    throw new UsageError(
+      "Pass --origin with the origin of the cnxt that may connect, or --origin '*' for any website"
+    );
+  }
+  const prompt = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: "Origin: ",
+  });
+  prompt.on("SIGINT", () => process.exit(130));
+  console.log(
+    [
+      "Which cnxt may connect? Give its origin, e.g.",
+      "  https://cnxt.example.org",
+      "Separate several with spaces. Leave it empty to allow any website.",
+    ].join("\n")
+  );
+  try {
+    prompt.prompt();
+    for await (const line of prompt) {
+      try {
+        return parseOriginAnswer(line);
+      } catch (err) {
+        if (!(err instanceof UsageError)) throw err;
+        console.log(err.message);
+        prompt.prompt();
+      }
+    }
+    throw new UsageError("No origin given");
+  } finally {
+    prompt.close();
+  }
 }
 
 async function main() {
@@ -135,7 +185,9 @@ async function main() {
   } else if (command.kind === "version") {
     console.log(version());
   } else {
-    await serve(command.options);
+    const { options } = command;
+    if (options.origins.length === 0) options.origins = await askOrigins();
+    await serve(options);
   }
 }
 

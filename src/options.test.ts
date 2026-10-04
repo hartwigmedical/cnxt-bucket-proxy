@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { UsageError } from "./datasources.ts";
-import { DEFAULT_ORIGINS, DEFAULT_PORT, parseCommand } from "./options.ts";
+import { DEFAULT_PORT, parseCommand, parseOriginAnswer } from "./options.ts";
 
 describe("parseCommand", () => {
   it("serves the whole bucket by default", () => {
@@ -9,12 +9,12 @@ describe("parseCommand", () => {
       options: {
         location: { bucket: "my-bucket", prefix: "" },
         port: DEFAULT_PORT,
-        origins: DEFAULT_ORIGINS,
+        origins: [],
       },
     });
   });
 
-  it("takes a glob, port and extra origins", () => {
+  it("takes a glob, port and origins", () => {
     const command = parseCommand([
       "my-bucket",
       "runs/*",
@@ -32,9 +32,14 @@ describe("parseCommand", () => {
         glob: "runs/*",
         segments: ["runs", "*"],
         port: 4000,
-        origins: [...DEFAULT_ORIGINS, "https://cnxt.example.org"],
+        origins: ["https://cnxt.example.org", "http://localhost:5173"],
       },
     });
+  });
+
+  it("accepts '*' for any origin", () => {
+    const command = parseCommand(["my-bucket", "--origin", "*"]);
+    expect(command.kind === "serve" && command.options.origins).toEqual(["*"]);
   });
 
   it("handles help and version", () => {
@@ -60,5 +65,23 @@ describe("parseCommand", () => {
     expect(() => parseCommand(["b", "file1", "file2"])).toThrow(
       /Quote the glob/
     );
+  });
+});
+
+describe("parseOriginAnswer", () => {
+  it("takes one or more origins", () => {
+    expect(
+      parseOriginAnswer(" https://cnxt.example.org/,http://localhost:5173 ")
+    ).toEqual(["https://cnxt.example.org", "http://localhost:5173"]);
+    expect(parseOriginAnswer("*")).toEqual(["*"]);
+  });
+
+  it("allows any origin when left empty", () => {
+    expect(parseOriginAnswer("")).toEqual(["*"]);
+    expect(parseOriginAnswer("  ")).toEqual(["*"]);
+  });
+
+  it("rejects what isn't an origin", () => {
+    expect(() => parseOriginAnswer("cnxt.example.org")).toThrow(UsageError);
   });
 });

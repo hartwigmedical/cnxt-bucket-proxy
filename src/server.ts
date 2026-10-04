@@ -43,6 +43,7 @@ export interface DomainOptions {
   gcs: Gcs;
   location: BucketLocation;
   catalog: Catalog;
+  /** The origins that may connect; "*" allows any. */
   allowedOrigins: string[];
   log?: (message: string) => void;
 }
@@ -231,7 +232,7 @@ export function createDomainServer({
     const origin = req.headers.origin;
     res.setHeader("vary", "Origin");
     if (origin !== undefined) {
-      if (!origins.has(origin)) {
+      if (!origins.has("*") && !origins.has(origin)) {
         if (!refusedOrigins.has(origin)) {
           refusedOrigins.add(origin);
           log(

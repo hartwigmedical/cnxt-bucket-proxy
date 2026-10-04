@@ -8,12 +8,6 @@ import {
 
 export const DEFAULT_PORT = 3950;
 
-export const DEFAULT_ORIGINS = [
-  "https://middle-layer-poc.dev.hartwigmedicalfoundation.nl",
-  "http://middle-layer-poc.ingress.pilot-1",
-  "http://localhost:5173",
-];
-
 export const USAGE = `Usage: cnxt-bucket-proxy <bucket> [glob] [options]
 
 Serves a Google Cloud Storage bucket as a cnxt domain on 127.0.0.1, reading it
@@ -28,7 +22,9 @@ Arguments:
 
 Options:
   -p, --port <port>      Port to listen on (default ${DEFAULT_PORT})
-  -o, --origin <origin>  Also allow cnxt at this origin (repeatable)
+  -o, --origin <origin>  The origin of the cnxt that may connect, e.g.
+                         https://cnxt.example.org (repeatable), or '*' for
+                         any website. Asked for at launch when left out.
   -h, --help             Show this help
   -v, --version          Show the version
 `;
@@ -53,7 +49,10 @@ function port(value: string | undefined): number {
   return number;
 }
 
+export const ANY_ORIGIN = "*";
+
 function origin(value: string): string {
+  if (value.trim() === ANY_ORIGIN) return ANY_ORIGIN;
   try {
     const url = new URL(value);
     if (url.protocol === "http:" || url.protocol === "https:")
@@ -62,8 +61,14 @@ function origin(value: string): string {
     // Reported below.
   }
   throw new UsageError(
-    `--origin must be an http(s) origin such as https://cnxt.example.org, got "${value}"`
+    `"${value}" is not an origin such as https://cnxt.example.org, or '*' for any website`
   );
+}
+
+/** The origins typed at the launch prompt; nothing means any website. */
+export function parseOriginAnswer(answer: string): string[] {
+  const values = answer.split(/[\s,]+/).filter(Boolean);
+  return values.length === 0 ? [ANY_ORIGIN] : [...new Set(values.map(origin))];
 }
 
 export function parseCommand(argv: string[]): Command {
@@ -93,14 +98,13 @@ export function parseCommand(argv: string[]): Command {
     );
   }
   const [bucket, glob] = positionals;
-  const extraOrigins = (values.origin ?? []).map(origin);
   return {
     kind: "serve",
     options: {
       location: parseLocation(bucket),
       ...(glob === undefined ? {} : { glob, segments: parseGlob(glob) }),
       port: port(values.port),
-      origins: [...new Set([...DEFAULT_ORIGINS, ...extraOrigins])],
+      origins: [...new Set((values.origin ?? []).map(origin))],
     },
   };
 }

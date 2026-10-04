@@ -5,10 +5,12 @@ reads the bucket with your own Google credentials, so cnxt can open anything
 you can read, and the bucket needs no CORS or IAM changes.
 
 ```
-npx github:hartwigmedical/cnxt-bucket-proxy <bucket> [glob]
+npx github:hartwigmedical/cnxt-bucket-proxy <bucket> [glob] \
+  --origin https://cnxt.example.org
 ```
 
-It prints the URL to add in cnxt (Sources → Add → Domain → Add custom domain,
+`--origin` is the cnxt that may connect; leave it out and the proxy asks. It
+prints the URL to add in cnxt (Sources → Add → Domain → Add custom domain,
 Auth: None):
 
 ```
@@ -66,18 +68,21 @@ Anything that can reach the proxy reads with your credentials, so it:
 - listens on 127.0.0.1 only;
 - answers only requests addressed to `127.0.0.1`, `localhost` or `[::1]` on
   its own port, which stops DNS rebinding;
-- allows CORS only for the known cnxt origins (`--origin` adds more), and
-  refuses requests from other origins;
+- refuses requests from origins other than the ones you allow. With
+  `--origin '*'`, or an empty answer at the prompt, any website you visit
+  while the proxy runs can read through it (Chrome asks you first; other
+  browsers may not), and the proxy warns about it;
 - serves only table files below a datasource.
 
 ## Options
 
 - `-p, --port <port>`: default 3950. The base URL in cnxt includes it, so keep
   using the same port for a bucket.
-- `-o, --origin <origin>`: allow cnxt at another origin, on top of
-  `https://middle-layer-poc.dev.hartwigmedicalfoundation.nl`,
-  `http://middle-layer-poc.ingress.pilot-1` and `http://localhost:5173`.
-  Repeatable. The proxy logs the origins it refuses.
+- `-o, --origin <origin>`: the origin of the cnxt that may connect, e.g.
+  `https://cnxt.example.org` or `http://localhost:5173`. Repeatable; `'*'`
+  allows any website. Without it, the proxy asks at launch (an empty answer
+  allows any website), or exits when it can't ask, e.g. in a script. The proxy
+  logs the origins it refuses.
 
 ## Development
 

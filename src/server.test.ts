@@ -28,13 +28,16 @@ async function json(response: Response | Promise<Response>): Promise<any> {
   return (await response).json();
 }
 
-async function start(datasources: Datasource[]) {
+async function start(
+  datasources: Datasource[],
+  allowedOrigins: string[] = [ORIGIN]
+) {
   logs = [];
   server = createDomainServer({
     gcs,
     location: { bucket: "bucket", prefix: "" },
     catalog: new Catalog(async () => datasources, 60_000),
-    allowedOrigins: [ORIGIN],
+    allowedOrigins,
     log: (message) => logs.push(message),
   });
   server.listen(0, "127.0.0.1");
@@ -231,6 +234,20 @@ describe("access", () => {
     expect(response.headers.get("access-control-expose-headers")).toContain(
       "Content-Range"
     );
+  });
+
+  it("allows any origin with *", async () => {
+    server.closeAllConnections();
+    server.close();
+    await start([datasource("S1")], ["*"]);
+    const response = await fetch(`${base}/S1/x.tsv`, {
+      headers: { origin: "https://elsewhere.test" },
+    });
+    expect(response.status).toBe(206);
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "https://elsewhere.test"
+    );
+    expect(logs).toEqual([]);
   });
 
   it("refuses other origins, and says once how to allow them", async () => {
